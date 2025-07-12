@@ -1,4 +1,4 @@
-use super::disk_hash::{DiskHashTable, build_hash_table_from_csv};
+use super::disk_hash::DiskHashTable;
 use super::trip_struct::Trip;
 use std::collections::HashMap;
 use std::error::Error;
