@@ -29,14 +29,15 @@ impl From<PaginationQuery> for Pagination {
 pub struct PriceRangeQuery {
     min: Option<f64>,
     max: Option<f64>,
-    #[serde(flatten)]
-    pagination: PaginationQuery,
+    page: Option<usize>,
+    per_page: Option<usize>,
 }
 
 //Viaje por ID
 async fn get_trip_by_id(
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    // Código existente sin cambios
     match get_trips_by_index(&id) {
         Ok(Some(trip)) => {
             let json_trip = serde_json::to_value(trip).map_err(|e| {
@@ -58,7 +59,10 @@ async fn get_trips_by_price(
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let min = query.min.unwrap_or(0.0);
     let max = query.max.unwrap_or(f64::MAX);
-    let pagination = Pagination::from(query.pagination);
+    let pagination = Pagination {
+        page: query.page.unwrap_or(1),
+        per_page: query.per_page.unwrap_or(50),
+    };
 
     match get_trips_by_price_range(min, max, pagination) {
         Ok(result) => {
@@ -97,7 +101,7 @@ async fn get_trips_by_dest(
 
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/:id", get(get_trip_by_id))
+        .route("/{id}", get(get_trip_by_id))
         .route("/price", get(get_trips_by_price))
-        .route("/destination/:dest", get(get_trips_by_dest))
+        .route("/destination/{dest}", get(get_trips_by_dest))
 }
