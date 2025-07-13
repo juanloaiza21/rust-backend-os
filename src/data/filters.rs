@@ -1,4 +1,5 @@
 use super::disk_hash::DiskHashTable;
+use super::pagination::{PagedResult, Pagination};
 use super::trip_struct::Trip;
 use std::collections::HashMap;
 use std::error::Error;
@@ -328,4 +329,114 @@ pub fn initialize_hash_index<P: AsRef<Path>>(csv_path: P) -> Result<usize, Box<d
     println!("Índice hash inicializado con {} registros", count);
 
     Ok(count)
+}
+
+/**
+* Estas funciones si funcionan para la API, las de arriba funcionaban para la version nativa.
+* Es importante resaltar que claramente habra un menor rendimiento ya que debe precargar los datos
+* en ram para que asi sean entregados a traves de la API. En todo caso mantiene el uso de la
+* paginacion para aligerar el rendimiento.
+* */
+
+pub fn filter_with_pagination<P: AsRef<Path>>(
+    csv_path: P,
+    filter: TripFilter,
+    pagination: Pagination,
+) -> Result<PagedResult<Trip>, Box<dyn Error>> {
+    let start = Instant::now();
+    let mut all_matches = Vec::new();
+    let mut total_count = 0;
+
+    if let Some(index) = can_use_hash_index(&filter) {
+        println!(
+            "Usando índice hash para búsqueda rápida por índice: {}",
+            index
+        );
+        let hash_table_ref = get_or_initialize_hash_table(&csv_path)?;
+
+        if let Some(hash_table) = hash_table_ref.lock().unwrap().as_ref() {
+            if let Ok(Some(trip)) = hash_table.get(&index) {
+                if filter.matches(&trip) {
+                    total_count = 1;
+
+                    if pagination.page == 1 {
+                        all_matches.push(trip.clone());
+                    }
+                }
+            }
+
+            return Ok(PagedResult::new(
+                all_matches,
+                total_count,
+                &pagination,
+                start.elapsed(),
+            ));
+        }
+    }
+
+    println!("Usando escaneo secuencial de CSV para filtrado con paginación");
+
+    let skip = (pagination.page - 1) * pagination.per_page;
+    let take = pagination.per_page;
+
+    super::data_lector::stream_process_csv(csv_path.as_ref(), |trip| {
+        if filter.matches(trip) {
+            total_count += 1;
+        }
+        Ok(())
+    })?;
+
+    let mut current_index = 0;
+    super::data_lector::stream_process_csv(csv_path.as_ref(), |trip| {
+        if filter.matches(trip) {
+            if current_index >= skip && current_index < skip + take {
+                all_matches.push(trip.clone());
+            } else if current_index >= skip + take {
+                return Err("Página completada".into());
+            }
+            current_index += 1;
+        }
+        Ok(())
+    })
+    .or_else(|e| {
+        if e.to_string() == "Página completada" {
+            Ok(())
+        } else {
+            Err(e)
+        }
+    })?;
+
+    Ok(PagedResult::new(
+        all_matches,
+        total_count,
+        &pagination,
+        start.elapsed(),
+    ))
+}
+
+pub fn get_trip_by_index<P: AsRef<Path>>(
+    csv_path: P,
+    index: &str,
+) -> Result<Option<Trip>, Box<dyn Error>> {
+    let hash_table_ref = get_or_initialize_hash_table(&csv_path)?;
+    if let Some(hash_table) = hash_table_ref.lock().unwrap().as_ref() {
+        return hash_table.get(index);
+    }
+    let mut result = None;
+    super::data_lector::stream_process_csv(csv_path, |trip| {
+        if trip.index == index {
+            result = Some(trip.clone());
+            return Err("Encontrado".into());
+        }
+        Ok(())
+    })
+    .or_else(|e| {
+        if e.to_string() == "Encontrado" {
+            Ok(())
+        } else {
+            Err(e)
+        }
+    })?;
+
+    Ok(result)
 }
