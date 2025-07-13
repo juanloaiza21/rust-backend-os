@@ -1,10 +1,15 @@
+use crate::data::{filter_by_destination, filter_by_index, filter_by_price_range};
 use crate::utils;
+
+mod data_intput_struct;
 
 use axum::{
     Router,
+    extract::Query,
     response::IntoResponse,
     routing::{get, post},
 };
+use serde::Deserialize;
 
 /*
 * Las dos primeras peticiones son para validar que este funcionando correctamente la API.
