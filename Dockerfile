@@ -1,17 +1,26 @@
-FROM rust:1.74-slim as builder
+FROM rustlang/rust:nightly as builder
 
 # Instalar Python y dependencias necesarias
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     pkg-config \
-    libssl-dev
+    libssl-dev \
+    sed
 
 WORKDIR /usr/src/app
 COPY . .
 
 # Ejecutar el script para generar el CSV
-RUN cd src/data && python3 datagen.py && cd .. && cd ..
+RUN cd src/data && python3 datagen.py
+
+# Modificar temporalmente Cargo.toml para cambiar la edición a 2021
+RUN sed -i 's/edition = "2024"/edition = "2021"/' Cargo.toml
+
+# Habilitar las características inestables necesarias
+RUN touch src/lib.rs
+RUN echo '#![feature(lazy_cell)]' > src/lib.rs
+RUN echo '#![feature(file_create_new)]' >> src/lib.rs
 
 # Compilar para release
 RUN cargo build --release
