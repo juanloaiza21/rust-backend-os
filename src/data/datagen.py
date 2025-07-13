@@ -31,7 +31,7 @@ with open('data.csv', mode, newline='') as csvfile:
         writer.writeheader()
     
     # Write the data to the CSV in loop
-    for i in range(1, 1000):
+    for i in range(1, 100000):
         # Create a dictionary for the row
         trip_distance = round(random.uniform(0.5, 10.0), 2)
         fare_amount = (round(random.uniform(3.0, 50.0), 2)*round(random.uniform(0.5, 10.0), 2))/2
