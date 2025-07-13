@@ -1,6 +1,7 @@
 use super::disk_hash::DiskHashTable;
 use super::pagination::{PagedResult, Pagination};
 use super::trip_struct::Trip;
+use crate::Instant;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{self, File};
@@ -9,7 +10,6 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use std::sync::Mutex;
 use std::sync::Once;
-
 const HASH_DIR: &str = "tmp/hash_index";
 static HASH_INIT: Once = Once::new();
 static HASH_TABLE: LazyLock<Mutex<Option<DiskHashTable>>> = LazyLock::new(|| Mutex::new(None));
